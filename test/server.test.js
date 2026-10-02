@@ -187,3 +187,21 @@ test('welcome page plays the present film and counts down to Christmas', async (
   assert.match(html, /Christmas 2026/);
   assert.match(html, /prefers-reduced-motion: reduce/);
 });
+
+test('season menu: a pick is kept in a cookie and wins over the date; Automatic forgets it', async () => {
+  const pick = (season, referer) =>
+    fetch(`${base}/season`, { method: 'POST', body: new URLSearchParams({ season }), redirect: 'manual', headers: referer ? { referer } : {} });
+  let res = await pick('winter', `${base}/people?flash=hi`);
+  assert.equal(res.status, 303);
+  assert.equal(res.headers.get('location'), '/people'); // back where they were, without the old flash
+  assert.match(res.headers.get('set-cookie'), /^season=winter; Max-Age=31536000; Path=\/; SameSite=Lax$/);
+
+  const page = await (await fetch(`${base}/people`, { headers: { cookie: 'season=winter' } })).text();
+  assert.match(page, /class="s-winter"/); // the test date (20 Nov) is autumn
+  assert.match(page, /value="winter" role="menuitemradio" aria-checked="true"/);
+
+  res = await pick('auto', 'https://example.com/elsewhere');
+  assert.equal(res.headers.get('location'), '/'); // never sent off to another site
+  assert.match(res.headers.get('set-cookie'), /^season=; Max-Age=0/);
+  assert.match(await get('/people'), /class="s-autumn"[\s\S]*value="auto" role="menuitemradio" aria-checked="true"/);
+});

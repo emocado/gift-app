@@ -22,7 +22,7 @@ npm start                   # open http://localhost:3000
 npm test                    # tests for the core logic (free, no network)
 ```
 
-The look follows the season: snow from 1 Dec to 6 Jan, blossom petals to April, light rain through August, then falling leaves. They settle into a small pile along the bottom of the window. To preview another one, set `SEASON=winter` (or `spring`, `summer`, `autumn`) in `.env`. The animation is switched off if your system asks for reduced motion.
+The look follows the season: snow from 1 Dec to 6 Jan, blossom petals to April, light rain through August, then falling leaves. They settle into a small pile along the bottom of the window. To try another one, pick it from the season menu next to "Gift" at the top of any page. Your browser remembers the pick, and "Automatic" goes back to following the date. `SEASON=winter` (or `spring`, `summer`, `autumn`) in `.env` changes the automatic one. The animation is switched off if your system asks for reduced motion.
 
 There's a landing page at http://localhost:3000/welcome. Its hero is a looping CSS animation: a present unwraps, past gifts rise out, one is typed in, and the countdown drops. It's CSS only, like the rest of the app, and has a pause button. With reduced motion it shows a still frame.
 

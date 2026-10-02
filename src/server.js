@@ -49,6 +49,21 @@ function aiFailureReason(err) {
   return "Couldn't read that automatically.";
 }
 
+const cookie = (req, name) =>
+  (req.headers?.cookie ?? '').split(';').map((c) => c.trim().split('=')).find(([k]) => k === name)?.[1];
+
+// Back to the page the request came from, if it was a page of this app.
+function backTo(req) {
+  try {
+    const ref = new URL(req.headers?.referer ?? '');
+    if (ref.host !== req.headers.host) return '/';
+    ref.searchParams.delete('flash');
+    return ref.pathname + ref.search;
+  } catch {
+    return '/';
+  }
+}
+
 // Ticked pill toggles named like "event_3" -> [3].
 const idsFrom = (f, prefix) =>
   Object.keys(f)
@@ -57,17 +72,22 @@ const idsFrom = (f, prefix) =>
     .filter(Number.isInteger);
 
 export function createApp({ db, today = localToday, parseEntry = null, season: fixedSeason = null }) {
-  // A fixed season (SEASON=winter in .env) previews a theme; otherwise it follows the date.
-  const season = () => SEASONS[fixedSeason] ?? seasonFor(today());
+  // The season someone picked in the menu (a cookie) wins, then a fixed SEASON=winter
+  // in .env, then the date. `chosen` tells the menu which option to tick.
+  const seasonOf = (req) => {
+    const picked = SEASONS[cookie(req, 'season')];
+    if (picked) return { ...picked, chosen: true };
+    return SEASONS[fixedSeason] ?? seasonFor(today());
+  };
   const peopleNames = () => db.listPeople().map((p) => p.name);
 
   const giftForm = (res, values, extra = {}) =>
-    send(res, extra.status ?? 200, views.giftFormPage({ values, peopleNames: peopleNames(), events: db.listEvents(), aiEnabled: !!parseEntry, season: season(), ...extra }));
+    send(res, extra.status ?? 200, views.giftFormPage({ values, peopleNames: peopleNames(), events: db.listEvents(), aiEnabled: !!parseEntry, season: res.season, ...extra }));
 
   const peoplePage = (res, status, extra = {}) =>
-    send(res, status, views.peoplePage({ people: db.listPeople(), gifts: db.listGifts(), events: db.listEvents(), season: season(), ...extra }));
+    send(res, status, views.peoplePage({ people: db.listPeople(), gifts: db.listGifts(), events: db.listEvents(), season: res.season, ...extra }));
   const eventsPage = (res, status, extra = {}) =>
-    send(res, status, views.eventsPage({ events: db.listEvents(), people: db.listPeople(), today: today(), season: season(), ...extra }));
+    send(res, status, views.eventsPage({ events: db.listEvents(), people: db.listPeople(), today: today(), season: res.season, ...extra }));
   const eventFrom = (f) => ({ name: f.name, date: f.date, repeats: f.repeats === '1', personIds: idsFrom(f, 'person_') });
 
   const emptyValues = () => ({ person: '', what: '', occasion: 'christmas', givenDate: today(), cost: '', occasionDate: '', entry: '' });
@@ -130,6 +150,15 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
     const path = url.pathname;
     const flash = views.flashBox(url.searchParams.get('flash'));
     let m;
+    res.season = seasonOf(req);
+
+    // The season menu: remember a pick for a year, or forget it for "Automatic".
+    if (req.method === 'POST' && path === '/season') {
+      const { season: pick } = await readForm(req);
+      const value = SEASONS[pick] ? `season=${pick}; Max-Age=31536000` : 'season=; Max-Age=0';
+      res.writeHead(303, { Location: backTo(req), 'Set-Cookie': `${value}; Path=/; SameSite=Lax` });
+      return res.end();
+    }
 
     if (req.method === 'GET' && path === '/') {
       return send(res, 200, views.homePage({
@@ -137,10 +166,10 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
         sections: upcomingSections(db, today(), HOME_WINDOW_DAYS),
         peopleCount: db.listPeople().length,
         flash,
-        season: season(),
+        season: res.season,
       }));
     }
-    if (req.method === 'GET' && path === '/welcome') return send(res, 200, landingPage({ today: today(), season: season() }));
+    if (req.method === 'GET' && path === '/welcome') return send(res, 200, landingPage({ today: today(), season: res.season }));
     if (req.method === 'GET' && path === '/gifts/new') {
       const q = Object.fromEntries(url.searchParams);
       return giftForm(res, { ...emptyValues(), ...q });
@@ -149,7 +178,7 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
     if (req.method === 'POST' && path === '/gifts/parse' && parseEntry) return parseGift(req, res);
     if (req.method === 'POST' && (m = path.match(/^\/gifts\/(\d+)\/delete$/))) {
       const gift = db.getGift(Number(m[1]));
-      if (!gift) return send(res, 404, views.notFoundPage({ season: season() }));
+      if (!gift) return send(res, 404, views.notFoundPage({ season: res.season }));
       db.deleteGift(gift.id);
       return redirect(res, withFlash(`/people/${gift.personId}`, `Deleted: ${gift.what}.`));
     }
@@ -168,9 +197,9 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
     // A person's page shows their history and is where their birthday and lists are edited.
     if ((m = path.match(/^\/people\/(\d+)$/)) && (req.method === 'GET' || req.method === 'POST')) {
       const person = db.getPerson(Number(m[1]));
-      if (!person) return send(res, 404, views.notFoundPage({ season: season() }));
+      if (!person) return send(res, 404, views.notFoundPage({ season: res.season }));
       const page = (extra) =>
-        views.personPage({ person, history: personHistory(person.id, db.listGifts()), events: db.listEvents(), flash, season: season(), ...extra });
+        views.personPage({ person, history: personHistory(person.id, db.listGifts()), events: db.listEvents(), flash, season: res.season, ...extra });
       if (req.method === 'GET') return send(res, 200, page());
       const f = await readForm(req);
       try {
@@ -207,7 +236,7 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
         return eventsPage(res, 400, { error: err.message });
       }
     }
-    return send(res, 404, views.notFoundPage({ season: season() }));
+    return send(res, 404, views.notFoundPage({ season: res.season }));
   };
 }
 

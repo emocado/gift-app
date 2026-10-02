@@ -2,7 +2,7 @@
 // script only add niceties (busy state, delete confirmation, example chips).
 import { formatCost } from './money.js';
 import { daysBetween, nextEventDate } from './occasions.js';
-import { seasonFor } from './season.js';
+import { SEASONS, seasonFor } from './season.js';
 
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -224,7 +224,29 @@ export const BASE_CSS = `
   [class^="s-"] { --bg:var(--sky-bottom); --nav:color-mix(in srgb, var(--sky-top) 70%, transparent); }
   body { min-height:100vh; background-color:var(--sky-bottom); background-attachment:fixed;
          background-image:var(--stars), radial-gradient(900px 520px at 85% -8%, var(--glow), transparent 70%), linear-gradient(180deg, var(--sky-top), var(--sky-bottom)); }
-  .season-emoji { font-size:15px; }
+  /* season menu: a pop-up beside the brand to try each season's look */
+  :root { --menu-bg:rgba(250,250,252,.94); }
+  @media (prefers-color-scheme: dark) { :root { --menu-bg:rgba(44,44,48,.94); } }
+  .season-menu { position:relative; }
+  .season-menu summary { list-style:none; display:flex; align-items:center; gap:4px; padding:4px 8px 4px 10px; border-radius:980px; background:var(--fill); cursor:pointer; font-size:15px; user-select:none; }
+  .season-menu summary::-webkit-details-marker { display:none; }
+  .season-menu summary:hover { background:var(--fill2); }
+  .season-menu summary svg { width:11px; height:11px; color:var(--fg2); transform:rotate(90deg); transition:transform .2s; }
+  .season-menu[open] summary svg { transform:rotate(-90deg); }
+  .menu { position:absolute; top:calc(100% + 8px); left:0; z-index:20; width:250px; padding:6px; border-radius:14px; background:var(--menu-bg);
+          backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%); box-shadow:0 12px 40px rgba(0,0,0,.2), 0 0 0 .5px var(--nav-line); }
+  .menu-title { font-size:12px; color:var(--fg2); font-weight:600; padding:6px 10px 4px; }
+  button.menu-item { width:100%; display:flex; align-items:center; justify-content:flex-start; gap:10px; background:transparent; color:var(--fg); border-radius:8px; padding:7px 10px;
+                     font-size:14px; font-weight:500; text-align:left; white-space:normal; }
+  button.menu-item:hover, button.menu-item:focus-visible { background:var(--tint); color:#fff; outline:none; }
+  button.menu-item:active { transform:none; }
+  .menu-item .e { font-size:18px; width:22px; text-align:center; }
+  .menu-item .t { flex:1; display:flex; flex-direction:column; line-height:1.25; }
+  .menu-item small { color:var(--fg2); font-size:12px; font-weight:400; }
+  .menu-item:hover small, .menu-item:focus-visible small { color:rgba(255,255,255,.85); }
+  .menu-item svg { color:var(--tint); }
+  .menu-item:hover svg, .menu-item:focus-visible svg { color:#fff; }
+  .menu hr { border:0; border-top:.5px solid var(--sep); margin:4px 8px; }
   @media (max-width:640px) { .tabs a { padding:5px 12px; } .brand span.name { display:none; } }
 `;
 
@@ -425,6 +447,10 @@ const SCRIPT = `
     el.classList.remove('busy'); el.disabled = false;
     const l = el.querySelector?.('.label'); if (l && el.dataset.idle) l.textContent = el.dataset.idle;
   }));
+  // Close the season menu on a click outside it or on Escape.
+  const closeMenus = (except) => document.querySelectorAll('details.season-menu[open]').forEach((d) => d !== except && (d.open = false));
+  document.addEventListener('click', (e) => closeMenus(e.target.closest('details.season-menu')));
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && closeMenus());
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-fill]');
     if (!c) return;
@@ -457,10 +483,30 @@ export const FONT_LINKS = `<link rel="preconnect" href="https://fonts.googleapis
 export function topbar({ active = '', season, wide = false }) {
   const tab = (href, name, label) => `<a href="${href}" class="${active === name ? 'on' : ''}">${label}</a>`;
   return `<header class="topbar"><div class="wrap${wide ? ' wide' : ''}">
-  <a class="brand" href="/welcome"><span class="brand-mark">${ICONS.gift}</span><span class="name">Gift</span><span class="season-emoji" aria-hidden="true">${season.emoji}</span></a>
+  <a class="brand" href="/welcome"><span class="brand-mark">${ICONS.gift}</span><span class="name">Gift</span></a>
+  ${seasonMenu(season)}
   <nav class="tabs" aria-label="Main">${tab('/', 'home', 'Home')}${tab('/people', 'people', 'People')}${tab('/events', 'events', 'Events')}</nav>
   <a class="btn sm" href="/gifts/new">${ICONS.plus} Add a gift</a>
 </div></header>`;
+}
+
+// "Automatic" follows the date (or SEASON in .env); picking one keeps it on this browser.
+const SEASON_CHOICES = [
+  ['winter', 'Winter', 'Snow on a starry night'],
+  ['spring', 'Spring', 'Blossom petals'],
+  ['summer', 'Summer', 'Light rain'],
+  ['autumn', 'Autumn', 'Falling leaves'],
+];
+export function seasonMenu(season) {
+  const current = season.chosen ? season.key : 'auto';
+  const item = (key, emoji, label, sub) =>
+    `<button type="submit" class="menu-item" name="season" value="${key}" role="menuitemradio" aria-checked="${key === current}">
+      <span class="e" aria-hidden="true">${emoji}</span><span class="t">${label}<small>${sub}</small></span>${key === current ? ICONS.check : ''}</button>`;
+  return `<details class="season-menu"><summary title="Change the season look" aria-label="Season look: ${season.key}">${season.emoji}${ICONS.chevron}</summary>
+    <form method="post" action="/season" class="menu" role="menu"><div class="menu-title">Season look</div>
+      ${item('auto', '✨', 'Automatic', 'Follows the date')}<hr>
+      ${SEASON_CHOICES.map(([k, label, sub]) => item(k, SEASONS[k].emoji, label, sub)).join('')}
+    </form></details>`;
 }
 
 function layout({ title, active = '', body, flash = '', season = seasonFor(new Date().toLocaleDateString('en-CA')) }) {
