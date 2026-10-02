@@ -32,6 +32,16 @@ const SCHEMA = `
     person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     PRIMARY KEY (event_id, person_id)
   );
+  -- Gifts other people gave you. Kept apart from gifts, so they never count as
+  -- covering anyone for an occasion.
+  CREATE TABLE IF NOT EXISTS received (
+    id INTEGER PRIMARY KEY,
+    person_id INTEGER NOT NULL REFERENCES people(id),
+    what TEXT NOT NULL,
+    received_date TEXT NOT NULL,
+    cost_cents INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -51,6 +61,7 @@ const toGift = (r) =>
     eventId: r.event_id ?? null,
     eventName: r.event_name ?? null,
   };
+const toReceived = (r) => r && { id: r.id, personId: r.person_id, what: r.what, receivedDate: r.received_date, costCents: r.cost_cents };
 
 function cleanBirthday(b) {
   if (b === undefined || b === null || b === '') return null;
@@ -178,6 +189,23 @@ export function openDb(path) {
     },
 
     deleteGift: (id) => db.prepare('DELETE FROM gifts WHERE id = ?').run(id),
+
+    // Gifts people gave you, newest first.
+    listReceived: () => db.prepare('SELECT * FROM received ORDER BY received_date DESC, id DESC').all().map(toReceived),
+    getReceived: (id) => toReceived(db.prepare('SELECT * FROM received WHERE id = ?').get(id)) ?? null,
+
+    addReceived({ personId, what, receivedDate, costCents = null }) {
+      if (!getPerson(personId)) throw new Error('person not found');
+      const w = String(what ?? '').trim();
+      if (!w) throw new Error('what is required');
+      if (!ISO_DATE.test(receivedDate ?? '')) throw new Error('date received must be YYYY-MM-DD');
+      const { lastInsertRowid } = db
+        .prepare('INSERT INTO received (person_id, what, received_date, cost_cents) VALUES (?, ?, ?, ?)')
+        .run(personId, w, receivedDate, costCents ?? null);
+      return toReceived(db.prepare('SELECT * FROM received WHERE id = ?').get(lastInsertRowid));
+    },
+
+    deleteReceived: (id) => db.prepare('DELETE FROM received WHERE id = ?').run(id),
     close: () => db.close(),
   };
 }

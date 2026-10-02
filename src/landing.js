@@ -235,7 +235,7 @@ const PAGE_CSS = `
   .features, .steps { display: grid; gap: 16px; }
   @media (min-width: 760px) { .features, .steps { grid-template-columns: repeat(3, 1fr); } }
   .features { margin-bottom: 16px; }
-  .feature, .steps li, .countdown { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); border: .5px solid var(--card-line); }
+  .feature, .steps li, .countdown, .soon { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); border: .5px solid var(--card-line); }
   .feature { padding: 24px; }
   .feature .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; margin-bottom: 14px; background: var(--tint-soft); }
   .feature:nth-child(2) .ico { background: var(--green-bg); }
@@ -248,6 +248,12 @@ const PAGE_CSS = `
   .steps li strong { color: var(--fg); font-weight: 600; }
   .steps li::before { content: counter(step); flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
     font-size: 14px; font-weight: 600; background: var(--tint); color: #fff; }
+  .soon { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; padding: 24px; margin-bottom: 16px; }
+  .soon .ico { flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; background: rgba(175,82,222,.13); }
+  .soon .grow { flex: 1; min-width: 240px; }
+  .soon .eyebrow { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--fg2); text-transform: uppercase; letter-spacing: .04em; }
+  .soon h3 { font-size: 21px; font-weight: 650; letter-spacing: -.02em; margin: 0 0 4px; }
+  .soon p { margin: 0; color: var(--fg2); font-size: 15px; max-width: 60ch; }
   .countdown { text-align: center; padding: 48px 24px; margin-bottom: 48px; border-radius: 22px; }
   .countdown .big { font-size: clamp(56px, 10vw, 88px); font-weight: 700; letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums; }
   .countdown p { color: var(--fg2); font-size: 19px; margin: 12px auto 24px; max-width: 40ch; }
@@ -315,6 +321,16 @@ ${topbar({ season, wide: true })}
   <li><span><strong>Log gifts as you buy.</strong> Ten seconds at the till, or one typed line.</span></li>
   <li><span><strong>Check before the occasion.</strong> See who's covered, who's left, and what you spent.</span></li>
 </ol>
+
+<section class="soon reveal">
+  <div class="ico" aria-hidden="true">🤝</div>
+  <div class="grow">
+    <p class="eyebrow">Coming soon</p>
+    <h3>Share with friends</h3>
+    <p>Invite a friend and you both keep one record: what you gave each other, and who's ahead, so you know when the next gift should be a bigger one. Gifts for an occasion still to come stay hidden until the day.</p>
+  </div>
+  <a class="btn soft" href="/preview/sharing">See a preview</a>
+</section>
 
 <section class="countdown reveal">
   <div class="big">${days === 0 ? 'Today!' : `${days} day${days === 1 ? '' : 's'}`}</div>

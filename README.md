@@ -28,6 +28,25 @@ There's a landing page at http://localhost:3000/welcome. Its hero is a looping C
 
 Amounts are in SGD. Data is stored in `data/gifts.db` (one SQLite file, not committed). Back it up by copying that file.
 
+## Spend and balance per person
+
+- **People** shows, for everyone, what you've spent on them so far and how many gifts that covers.
+- On a person's page, **Gifts from them** is where you log what they gave you, with the date and roughly what it was worth. The page then shows three totals: what you've spent on them, what they've spent on you, and the **balance** (for example "S$10.00 behind" if they've spent S$10 more on you). The same balance shows on the People list, so you know who should get a bigger gift next time to break even.
+- Gifts without a cost aren't counted, and the page says how many were left out. Gifts you received never count as gifts *for* that person, so they don't affect who's covered for an occasion, the reminder, or "last time".
+
+## Planned: share with friends
+
+Not built yet. The landing page (`/welcome`) and the home page both link to a preview with made-up data at http://localhost:3000/preview/sharing.
+
+The idea: today you type in what friends gave you yourself. With sharing, a friend keeps their side of the record in their own app.
+
+1. **Invite a friend** from their page. They get a link and sign up.
+2. **They see what you gave them**, but only once each occasion has come (on or after the occasion date). A gift you've logged for Christmas 2026 stays hidden until 25 Dec 2026, so logging early never spoils a surprise.
+3. **They log what they give you** in their own app, and it shows up on your side under "Gifts from them". You no longer type it in yourself.
+4. **You both see the balance**: you spent S$10 on them, they spent S$15 on you, so you're S$5 behind.
+
+What it needs that the app doesn't have yet: hosting (it runs on your PC only today), accounts and logins, invite links, and a way to link "Amy" on your list to Amy's account. The data won't need to change. Each gift a friend logs for you becomes a row in the same `received` table that you fill in by hand today, and the rule for what a friend can see is already written (`visibleToFriend` in `src/balance.js`).
+
 ## Type-to-log (AI)
 
 With `OPENCODE_API_KEY` set in `.env` (an [OpenCode Zen](https://opencode.ai/zen) key), the Add a gift page gets a box where you type one line, like `scarf for Amy, xmas, 25`. The model (`deepseek-v4.1-flash` by default) fills in the form and you check it before saving.

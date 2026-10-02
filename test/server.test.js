@@ -213,3 +213,40 @@ test('home lists occasions further out under Later, with how much is covered', a
   assert.match(html, /Later[\s\S]*Graduation 2027[\s\S]*0 of 1 covered/);
   assert.match(html, new RegExp(`occasion=event%3A${ev.id}&amp;occasionDate=2027-06-20`));
 });
+
+test('gifts from someone: log one, see the balance, then delete it', async () => {
+  const kim = db.addPerson({ name: 'Kim' });
+  await post('/gifts', { person: 'Kim', what: 'Tea set', occasion: 'christmas', cost: '10' });
+  let page = await get(`/people/${kim.id}`);
+  assert.match(page, /Gifts from Kim/);
+  assert.match(page, /name="receivedDate" type="date" value="2026-11-20"/); // defaults to today
+
+  let res = await post(`/people/${kim.id}/received`, { what: 'Perfume', receivedDate: '2026-08-02', cost: '15' });
+  assert.match(flashOf(res), /Saved: Perfume from Kim/);
+  page = await get(`/people/${kim.id}`);
+  assert.match(page, /Spent on Kim[\s\S]*S\$10\.00[\s\S]*Kim spent on you[\s\S]*S\$15\.00[\s\S]*S\$5\.00 behind/);
+  assert.match(await get('/people'), /Kim[\s\S]*S\$10\.00 · 1 gift[\s\S]*S\$5\.00 behind/);
+  // A gift from Kim never counts as one for Kim.
+  assert.equal(db.listGifts().filter((g) => g.personId === kim.id).length, 1);
+
+  const [r] = db.listReceived().filter((x) => x.personId === kim.id);
+  res = await post(`/received/${r.id}/delete`, {});
+  assert.match(flashOf(res), /Deleted: Perfume/);
+  assert.doesNotMatch(await get(`/people/${kim.id}`), /S\$5\.00 behind/);
+});
+
+test('gifts from someone: a missing what is refused with the form kept', async () => {
+  const jo = db.addPerson({ name: 'Jo' });
+  const res = await post(`/people/${jo.id}/received`, { what: '', receivedDate: '2026-08-02', cost: '42' });
+  assert.equal(res.status, 400);
+  assert.match(await res.text(), /value="42"/);
+});
+
+test('home and landing link to the sharing preview, which hides gifts for occasions still to come', async () => {
+  assert.match(await get('/'), /Coming soon: share with friends[\s\S]*href="\/preview\/sharing"/);
+  assert.match(await get('/welcome'), /Share with friends[\s\S]*href="\/preview\/sharing"/);
+  const html = await get('/preview/sharing');
+  assert.match(html, /made-up data/);
+  assert.match(html, /What Amy would see[\s\S]*1 gift for an occasion still to come stays hidden/);
+  assert.doesNotMatch(html, /action="\/(gifts|received)\/\d+\/delete"/);
+});

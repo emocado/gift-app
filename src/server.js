@@ -11,6 +11,7 @@ import * as views from './views.js';
 import { landingPage } from './landing.js';
 import { createEntryParser } from './ai/parse-entry.js';
 import { SEASONS, seasonFor } from './season.js';
+import { sharingPreview } from './sharing-preview.js';
 
 // Wide enough that Christmas shows from late September, when shopping for it starts.
 export const HOME_WINDOW_DAYS = 90;
@@ -85,7 +86,7 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
     send(res, extra.status ?? 200, views.giftFormPage({ values, peopleNames: peopleNames(), events: db.listEvents(), aiEnabled: !!parseEntry, season: res.season, ...extra }));
 
   const peoplePage = (res, status, extra = {}) =>
-    send(res, status, views.peoplePage({ people: db.listPeople(), gifts: db.listGifts(), events: db.listEvents(), season: res.season, ...extra }));
+    send(res, status, views.peoplePage({ people: db.listPeople(), gifts: db.listGifts(), received: db.listReceived(), events: db.listEvents(), season: res.season, ...extra }));
   const eventsPage = (res, status, extra = {}) =>
     send(res, status, views.eventsPage({ events: db.listEvents(), people: db.listPeople(), today: today(), season: res.season, ...extra }));
   const eventFrom = (f) => ({ name: f.name, date: f.date, repeats: f.repeats === '1', personIds: idsFrom(f, 'person_') });
@@ -197,11 +198,33 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
       }
     }
     // A person's page shows their history and is where their birthday and lists are edited.
-    if ((m = path.match(/^\/people\/(\d+)$/)) && (req.method === 'GET' || req.method === 'POST')) {
+    if ((m = path.match(/^\/people\/(\d+)(\/received)?$/)) && (req.method === 'GET' || req.method === 'POST')) {
       const person = db.getPerson(Number(m[1]));
       if (!person) return send(res, 404, views.notFoundPage({ season: res.season }));
       const page = (extra) =>
-        views.personPage({ person, history: personHistory(person.id, db.listGifts()), events: db.listEvents(), flash, season: res.season, ...extra });
+        views.personPage({
+          person,
+          history: personHistory(person.id, db.listGifts()),
+          received: db.listReceived().filter((r) => r.personId === person.id),
+          today: today(),
+          events: db.listEvents(),
+          flash,
+          season: res.season,
+          ...extra,
+        });
+      // A gift this person gave you, logged from their page.
+      if (m[2]) {
+        if (req.method !== 'POST') return send(res, 404, views.notFoundPage({ season: res.season }));
+        const f = await readForm(req);
+        try {
+          const r = db.addReceived({ personId: person.id, what: f.what, receivedDate: f.receivedDate, costCents: parseCost(f.cost) });
+          const notes = [`Saved: ${r.what} from ${person.name}.`];
+          if (r.costCents === null && (f.cost ?? '').trim()) notes.push(`"${f.cost}" isn't a number, so the cost was left blank.`);
+          return redirect(res, withFlash(`/people/${person.id}`, notes.join(' ')));
+        } catch (err) {
+          return send(res, 400, page({ error: err.message, receivedValues: f }));
+        }
+      }
       if (req.method === 'GET') return send(res, 200, page());
       const f = await readForm(req);
       try {
@@ -210,6 +233,16 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
       } catch (err) {
         return send(res, 400, page({ error: err.message }));
       }
+    }
+    if (req.method === 'POST' && (m = path.match(/^\/received\/(\d+)\/delete$/))) {
+      const r = db.getReceived(Number(m[1]));
+      if (!r) return send(res, 404, views.notFoundPage({ season: res.season }));
+      db.deleteReceived(r.id);
+      return redirect(res, withFlash(`/people/${r.personId}`, `Deleted: ${r.what}.`));
+    }
+    // The planned sharing feature, with made-up data.
+    if (req.method === 'GET' && path === '/preview/sharing') {
+      return send(res, 200, views.sharingPreviewPage({ today: today(), ...sharingPreview(today()), season: res.season }));
     }
     if (req.method === 'GET' && path === '/events') return eventsPage(res, 200, { flash });
     if (req.method === 'POST' && path === '/events') {

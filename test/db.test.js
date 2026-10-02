@@ -133,3 +133,23 @@ test('an older database without events gets upgraded in place', () => {
   db.close(); // Windows can't delete an open file
   rmSync(dir, { recursive: true });
 });
+
+test('received: add, list newest first, delete, and keep apart from gifts', () => {
+  const db = fresh();
+  const amy = db.addPerson({ name: 'Amy' });
+  db.addReceived({ personId: amy.id, what: 'Mug', receivedDate: '2025-12-25', costCents: 1500 });
+  const wallet = db.addReceived({ personId: amy.id, what: ' Wallet ', receivedDate: '2026-08-02' });
+  assert.deepEqual(wallet, { id: wallet.id, personId: amy.id, what: 'Wallet', receivedDate: '2026-08-02', costCents: null });
+  assert.deepEqual(db.listReceived().map((r) => r.what), ['Wallet', 'Mug']);
+  assert.deepEqual(db.listGifts(), []);
+  db.deleteReceived(wallet.id);
+  assert.equal(db.getReceived(wallet.id), null);
+});
+
+test('received: needs a known person, a what and a real date', () => {
+  const db = fresh();
+  const amy = db.addPerson({ name: 'Amy' });
+  assert.throws(() => db.addReceived({ personId: 99, what: 'x', receivedDate: '2026-01-01' }), /person not found/);
+  assert.throws(() => db.addReceived({ personId: amy.id, what: ' ', receivedDate: '2026-01-01' }), /what/);
+  assert.throws(() => db.addReceived({ personId: amy.id, what: 'x', receivedDate: '1 Jan' }), /YYYY-MM-DD/);
+});

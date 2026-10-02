@@ -3,6 +3,7 @@
 import { formatCost } from './money.js';
 import { daysBetween, nextEventDate } from './occasions.js';
 import { SEASONS, seasonFor } from './season.js';
+import { balance, visibleToFriend } from './balance.js';
 
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -45,6 +46,7 @@ const ICONS = {
   info: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M12 11v6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.4" fill="#fff"/></svg>',
   trash: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
   gift: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>',
+  people: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg>',
   sparkles: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10 3c.3 0 .5.2.6.5l1 3.4a5 5 0 0 0 3.5 3.5l3.4 1c.6.2.6 1 0 1.2l-3.4 1a5 5 0 0 0-3.5 3.5l-1 3.4c-.2.6-1 .6-1.2 0l-1-3.4a5 5 0 0 0-3.5-3.5l-3.4-1c-.6-.2-.6-1 0-1.2l3.4-1a5 5 0 0 0 3.5-3.5l1-3.4c.1-.3.3-.5.6-.5Z"/><path d="M18.5 1.5c.2 0 .3.1.4.3l.4 1.3c.2.6.6 1 1.2 1.2l1.3.4c.4.1.4.7 0 .8l-1.3.4c-.6.2-1 .6-1.2 1.2l-.4 1.3c-.1.4-.7.4-.8 0l-.4-1.3c-.2-.6-.6-1-1.2-1.2l-1.3-.4c-.4-.1-.4-.7 0-.8l1.3-.4c.6-.2 1-.6 1.2-1.2l.4-1.3c.1-.2.2-.3.4-.3Z"/></svg>',
 };
 
@@ -281,6 +283,7 @@ ${BASE_CSS}
   .occ-icon.christmas { background:var(--green-bg); }
   .occ-icon.birthday { background:rgba(255,55,95,.12); }
   .occ-icon.event { background:rgba(175,82,222,.13); }
+  .occ-icon.received { background:var(--tint-soft); }
   .badge { display:inline-block; background:var(--orange-bg); color:var(--orange); border-radius:6px; padding:1px 7px; font-size:12px; font-weight:600; white-space:nowrap; vertical-align:1px; }
   .tag { display:inline-flex; align-items:center; gap:4px; background:var(--fill2); color:var(--fg2); border-radius:6px; padding:1px 8px; font-size:13px; font-weight:500; }
   .tag.warn { background:var(--orange-bg); color:var(--orange); }
@@ -422,13 +425,24 @@ ${SKY_CSS}
   .people-add { display:grid; grid-template-columns:1.4fr 1fr; gap:14px 12px; align-items:end; }
   .people-add .full { grid-column:1 / -1; }
   form.inline { display:inline; margin:0; }
+  .received-add { display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:12px; align-items:end; padding:16px 20px 20px; border-top:.5px solid var(--sep); }
+  .received-add input { min-width:0; }
+
+  /* sharing teaser and preview */
+  .teaser { display:flex; align-items:center; gap:16px; padding:18px 20px; margin-top:28px; flex-wrap:wrap; }
+  .teaser .mark { flex:none; width:44px; height:44px; border-radius:12px; display:grid; place-items:center; color:#fff; background:linear-gradient(160deg,#5e5ce6,#bf5af2); }
+  .teaser .grow { flex:1; min-width:220px; }
+  .teaser h2 { font-size:17px; margin:0; letter-spacing:-.01em; }
+  .teaser p { margin:2px 0 0; color:var(--fg2); font-size:15px; }
+  .steps { margin:0; padding:16px 20px 18px 40px; display:grid; gap:8px; color:var(--fg2); }
+  .steps strong { color:var(--fg); font-weight:600; }
 
   @media (max-width:640px) {
     h1 { font-size:30px; }
     .tiles { grid-template-columns:1fr; }
     .field-row { grid-template-columns:1fr; }
     .field-row .field + .field { border-left:0; border-top:.5px solid var(--sep); }
-    .people-add, .two { grid-template-columns:1fr; }
+    .people-add, .two, .received-add { grid-template-columns:1fr; }
     .row-edit { padding-left:20px; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } .sky { display:none; } }
@@ -617,7 +631,8 @@ export function homePage({ today, sections, later = [], peopleCount, flash, seas
       body: `<section class="card hero"><div class="mark">${ICONS.gift}</div>
         <h1>Gifts</h1>
         <p>${esc(season.greeting)} Your list is empty. Add the people you give gifts to, or just log a gift and the name is added as you go.</p>
-        <div class="actions"><a class="btn lg" href="/gifts/new">Add a gift</a><a class="btn lg soft" href="/people">Add people</a></div></section>`,
+        <div class="actions"><a class="btn lg" href="/gifts/new">Add a gift</a><a class="btn lg soft" href="/people">Add people</a></div></section>
+        ${sharingTeaser()}`,
     });
   }
   const [next] = sections;
@@ -636,7 +651,49 @@ export function homePage({ today, sections, later = [], peopleCount, flash, seas
     body: `<div class="page-head"><div><p class="eyebrow">${formatToday(today)}</p><h1>Coming up</h1><p class="lede">${esc(season.greeting)}</p></div></div>
       ${tiles}
       ${sections.map((s) => occasionCard(today, s)).join('')}
-      ${laterList(today, later)}`,
+      ${laterList(today, later)}
+      ${sharingTeaser()}`,
+  });
+}
+
+// --- sharing (planned) ----------------------------------------------------------
+
+const sharingTeaser = () => `<section class="card teaser"><div class="mark">${ICONS.people}</div>
+    <div class="grow"><h2>Coming soon: share with friends</h2>
+      <p>Invite a friend, see what you’ve given each other, and who’s ahead.</p></div>
+    <a class="btn soft" href="/preview/sharing">See a preview</a></section>`;
+
+// The planned sharing feature, shown with made-up data from sharing-preview.js.
+// given: your gifts to the friend. received: the friend's gifts to you.
+export function sharingPreviewPage({ today, friend, given, received, season }) {
+  const f = esc(friend);
+  const shown = visibleToFriend(given, today);
+  const hidden = given.length - shown.length;
+  const ro = { readOnly: true };
+  return layout({
+    title: 'Share with friends',
+    season,
+    body: `<div class="page-head"><div><p class="eyebrow">Coming soon</p><h1>Share with friends</h1>
+        <p class="lede">Invite a friend and you both keep one record: what you gave them, what they gave you, and who’s ahead.</p></div></div>
+      ${flashBox('This is a preview with made-up data. Sharing isn’t built yet, and nothing on this page is saved.', 'info')}
+      <h2 class="section-title">How it would work</h2>
+      <section class="card"><ol class="steps">
+        <li><strong>Invite a friend</strong> from their page. They get a link and sign up.</li>
+        <li><strong>They see what you gave them</strong>, but only once each occasion has come, so logging early never spoils a surprise.</li>
+        <li><strong>They log what they give you</strong> in their own app, and it shows up on your side as a gift from them.</li>
+        <li><strong>You both see the balance</strong>, so you know when the next gift should be a bigger one.</li>
+      </ol></section>
+      <h2 class="section-title">What you’d see on ${f}’s page</h2>
+      ${balanceTiles(friend, given, received)}
+      <section class="card"><div class="group-label" style="padding-top:18px">Your gifts to ${f}</div>
+        <ul class="list">${given.map((g) => historyRow(g, ro)).join('')}</ul>
+        <div class="group-label">Logged by ${f}: gifts to you</div>
+        <ul class="list">${received.map((r) => receivedRow(r, ro)).join('')}</ul></section>
+      <h2 class="section-title">What ${f} would see</h2>
+      <section class="card"><div class="group-label" style="padding-top:18px">Gifts from you</div>
+        <ul class="list">${shown.map((g) => historyRow(g, ro)).join('')}</ul>
+        ${hidden ? `<div class="empty-row">${plural(hidden, 'gift')} for an occasion still to come ${hidden === 1 ? 'stays' : 'stay'} hidden until the day.</div>` : ''}</section>
+      <p class="hint" style="margin-top:20px"><a href="/">Back to home</a></p>`,
   });
 }
 
@@ -658,17 +715,53 @@ const listChips = (events, { onChristmasList, eventIds = [] }) =>
     .map((e) => chip(`event_${e.id}`, `🎉 ${esc(e.name)}`, eventIds.includes(e.id)))
     .join('')}</div>`;
 
-function historyRow(g) {
+const deleteButton = (action, what) =>
+  `<form class="inline" method="post" action="${action}" data-confirm="${esc(`Delete “${what}”? This can’t be undone.`)}">
+        <button class="icon" type="submit" aria-label="${esc(`Delete ${what}`)}" title="Delete">${ICONS.trash}</button></form>`;
+
+// readOnly: no delete button, for the sharing preview.
+function historyRow(g, { readOnly = false } = {}) {
   return `<li>${occIcon(g.occasion, 'sm')}<div class="row-main">
       <span class="row-text"><span class="row-title">${esc(g.what)}${dupBadge(g)}</span>
         <span class="row-sub">${esc(occasionLabel(g.occasion, g.occasionDate, g.eventName))} · Bought ${formatDate(g.givenDate)}</span></span>
       <span class="row-end">${formatCost(g.costCents)}</span>
-      <form class="inline" method="post" action="/gifts/${g.id}/delete" data-confirm="${esc(`Delete “${g.what}”? This can’t be undone.`)}">
-        <button class="icon" type="submit" aria-label="${esc(`Delete ${g.what}`)}" title="Delete">${ICONS.trash}</button></form>
+      ${readOnly ? '' : deleteButton(`/gifts/${g.id}/delete`, g.what)}
     </div></li>`;
 }
 
-export function personPage({ person, history, flash, error, season, events = [] }) {
+function receivedRow(r, { readOnly = false } = {}) {
+  return `<li><span class="occ-icon received sm" aria-hidden="true">🎁</span><div class="row-main">
+      <span class="row-text"><span class="row-title">${esc(r.what)}</span><span class="row-sub">Received ${formatDate(r.receivedDate)}</span></span>
+      <span class="row-end">${formatCost(r.costCents)}</span>
+      ${readOnly ? '' : deleteButton(`/received/${r.id}/delete`, r.what)}
+    </div></li>`;
+}
+
+// What you've spent on them, what they've spent on you, and how far apart that is.
+function balanceTiles(name, given, received) {
+  const n = esc(name);
+  const b = balance(given, received);
+  const pricedGiven = given.filter((g) => g.costCents !== null).length;
+  const avg = pricedGiven ? ` · avg ${formatCost(Math.round(b.givenCents / pricedGiven))}` : '';
+  const gap = !received.length
+    ? tile('Balance', '—', `Log what ${n} gave you to see it`)
+    : b.gapCents > 0
+      ? tile('Balance', `<span class="over">${formatCost(b.gapCents)} behind</span>`, 'To make up next time')
+      : b.gapCents < 0
+        ? tile('Balance', `<span class="under">${formatCost(-b.gapCents)} ahead</span>`, `You’ve spent more on ${n}`)
+        : tile('Balance', 'Even', 'You’ve both spent the same');
+  const unpriced = b.unpriced
+    ? `<p class="hint" style="margin:-16px 0 24px">${plural(b.unpriced, 'gift')} without a cost ${b.unpriced === 1 ? 'isn’t' : 'aren’t'} counted.</p>`
+    : '';
+  return `<div class="tiles">
+      ${tile(`Spent on ${n}`, formatCost(b.givenCents), `${plural(given.length, 'gift')}${avg}`)}
+      ${tile(`${n} spent on you`, formatCost(b.receivedCents), plural(received.length, 'gift'))}
+      ${gap}
+    </div>${unpriced}`;
+}
+
+// received: gifts this person gave you. receivedValues: the add form's values after an error.
+export function personPage({ person, history, received = [], today, receivedValues = {}, flash, error, season, events = [] }) {
   const onEvents = events.filter((e) => person.eventIds?.includes(e.id));
   const tags = [
     person.birthday ? `<span class="tag">🎂 Birthday ${formatBirthday(person.birthday)}</span>` : '<span class="tag">No birthday set</span>',
@@ -676,18 +769,15 @@ export function personPage({ person, history, flash, error, season, events = [] 
     ...onEvents.map((e) => `<span class="tag">🎉 ${esc(e.name)}</span>`),
   ];
   if (!person.birthday && !person.onChristmasList && !onEvents.length) tags.push('<span class="tag warn">Won’t show on the home page</span>');
-  const priced = history.filter((g) => g.costCents !== null);
-  const spent = priced.reduce((t, g) => t + g.costCents, 0);
-  const stats = history.length
-    ? `<div class="tiles">
-        ${tile('Gifts logged', history.length)}
-        ${tile('Total spent', formatCost(spent))}
-        ${tile('Average gift', priced.length ? formatCost(Math.round(spent / priced.length)) : '—', `across ${plural(priced.length, 'priced gift')}`)}
-      </div>`
-    : '';
+  const n = esc(person.name);
+  const stats = history.length || received.length ? balanceTiles(person.name, history, received) : '';
   const list = history.length
-    ? `<ul class="list">${history.map(historyRow).join('')}</ul>`
+    ? `<ul class="list">${history.map((g) => historyRow(g)).join('')}</ul>`
     : `<div class="empty-row" style="padding-top:16px">Nothing recorded yet.</div>`;
+  const fromList = received.length
+    ? `<ul class="list">${received.map((r) => receivedRow(r)).join('')}</ul>`
+    : `<div class="empty-row" style="padding-top:16px">Nothing logged yet. When ${n} gives you something, add it here to keep the balance.</div>`;
+  const rv = { what: '', receivedDate: today, cost: '', ...receivedValues };
   return layout({
     title: person.name,
     active: 'people',
@@ -698,6 +788,14 @@ export function personPage({ person, history, flash, error, season, events = [] 
         <a class="btn" href="${esc(giftUrl({ person: person.name }))}">${ICONS.plus} Add a gift for ${esc(person.name)}</a></div>
       ${stats}
       <section class="card"><div class="group-label" style="padding-top:18px">Gift history</div>${list}</section>
+      <h2 class="section-title">Gifts from ${n}</h2>
+      <section class="card">${fromList}
+        <form method="post" action="/people/${person.id}/received" class="received-add">
+          <div><label for="r-what" class="lbl">What ${n} gave you</label><input id="r-what" name="what" value="${esc(rv.what)}" required autocomplete="off" placeholder="e.g. Perfume"></div>
+          <div><label for="r-date" class="lbl">Date</label><input id="r-date" name="receivedDate" type="date" value="${esc(rv.receivedDate)}" required></div>
+          <div><label for="r-cost" class="lbl">Roughly worth</label><div class="money"><input id="r-cost" name="cost" inputmode="decimal" value="${esc(rv.cost)}" placeholder="Optional"></div></div>
+          <button type="submit">${ICONS.plus} Add</button>
+        </form></section>
       <h2 class="section-title">Details</h2>
       <section class="card"><form method="post" action="/people/${person.id}">
         <div class="field"><div class="label">Birthday</div>${birthdayFields(person.birthday)}</div>
@@ -788,9 +886,22 @@ export function giftFormPage({ values, peopleNames, error, confirmNewPerson, not
 
 // --- people ---------------------------------------------------------------------
 
-export function peoplePage({ people, gifts = [], events = [], flash, error, season }) {
-  const countOf = new Map();
-  for (const g of gifts) countOf.set(g.personId, (countOf.get(g.personId) ?? 0) + 1);
+// Spent so far on someone, plus how far behind or ahead of them you are once
+// gifts from them are logged.
+function personRowEnd(name, given, received) {
+  if (!given.length && !received.length) return '';
+  const b = balance(given, received);
+  const spent = given.length ? `${formatCost(b.givenCents)} · ${plural(given.length, 'gift')}` : 'Nothing given yet';
+  const gap = !received.length || b.gapCents === 0
+    ? ''
+    : b.gapCents > 0
+      ? `<span class="over" title="${esc(`${name} has spent ${formatCost(b.gapCents)} more on you`)}">${formatCost(b.gapCents)} behind</span>`
+      : `<span class="under">${formatCost(-b.gapCents)} ahead</span>`;
+  return `${spent}${gap ? `<br>${gap}` : ''}`;
+}
+
+// received: gifts people gave you, for the balance on each row.
+export function peoplePage({ people, gifts = [], received = [], events = [], flash, error, season }) {
   const onXmas = people.filter((p) => p.onChristmasList).length;
   const rows = people.length
     ? people
@@ -801,11 +912,11 @@ export function peoplePage({ people, gifts = [], events = [], flash, error, seas
             ...events.filter((e) => p.eventIds?.includes(e.id)).map((e) => `🎉 ${esc(e.name)}`),
           ].filter(Boolean);
           const sub = bits.length ? bits.join(' · ') : '<span class="tag warn">Not on any list</span>';
-          const n = countOf.get(p.id) ?? 0;
+          const end = personRowEnd(p.name, gifts.filter((g) => g.personId === p.id), received.filter((r) => r.personId === p.id));
           return `<li id="p${p.id}"><div class="row-main">
               <a class="row-link" href="/people/${p.id}">${avatar(p.name)}
                 <span class="row-text"><span class="row-title">${esc(p.name)}</span><span class="row-sub">${sub}</span></span>
-                <span class="row-end">${n ? plural(n, 'gift') : ''}</span><span class="chev">${ICONS.chevron}</span></a>
+                <span class="row-end" style="text-align:right">${end}</span><span class="chev">${ICONS.chevron}</span></a>
             </div></li>`;
         })
         .join('')
