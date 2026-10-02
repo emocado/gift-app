@@ -203,9 +203,9 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const db = openDb(process.env.DB_PATH ?? 'data/gifts.db');
   const port = Number(process.env.PORT ?? 3000);
-  const parseEntry = process.env.ANTHROPIC_API_KEY ? createEntryParser() : null;
+  const parseEntry = process.env.OPENCODE_API_KEY ? createEntryParser() : null;
   createServer(createApp({ db, parseEntry, season: process.env.SEASON })).listen(port, '127.0.0.1', () => {
     console.log(`Gift app running at http://localhost:${port}`);
-    if (!parseEntry) console.log('Type-to-log is off: set ANTHROPIC_API_KEY in .env to turn it on.');
+    if (!parseEntry) console.log('Type-to-log is off: set OPENCODE_API_KEY in .env to turn it on.');
   });
 }

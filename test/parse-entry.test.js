@@ -40,10 +40,10 @@ const fakeClient = (response) => {
   const calls = [];
   return {
     calls,
-    beta: { messages: { create: async (params) => (calls.push(params), response) } },
+    chat: { completions: { create: async (params) => (calls.push(params), response) } },
   };
 };
-const reply = (obj, stop_reason = 'end_turn') => ({ stop_reason, content: [{ type: 'text', text: JSON.stringify(obj) }] });
+const reply = (obj, finish_reason = 'stop') => ({ choices: [{ finish_reason, message: { content: JSON.stringify(obj) } }] });
 
 test('parseEntry: returns only the fields found, cleaned', async () => {
   const client = fakeClient(reply(raw({ person: 'amy', what: 'Scarf', occasion: 'christmas', cost: '30' })));
@@ -56,13 +56,14 @@ test('parseEntry: sends today, the list of names, the note, and asks for JSON', 
   const client = fakeClient(reply(raw({})));
   await createEntryParser({ client })('socks', { today: '2026-11-20', peopleNames: names });
   const p = client.calls[0];
-  assert.equal(p.model, 'claude-opus-5-5');
-  assert.equal(p.output_config.format.type, 'json_schema');
-  assert.match(p.messages[0].content, /2026-11-20[\s\S]*Amy, Ben Tan[\s\S]*socks/);
+  assert.equal(p.model, 'deepseek-v4.1-flash');
+  assert.equal(p.response_format.type, 'json_schema');
+  assert.equal(p.messages[0].role, 'system');
+  assert.match(p.messages[1].content, /2026-11-20[\s\S]*Amy, Ben Tan[\s\S]*socks/);
 });
 
 test('parseEntry: a refusal or cut-off reply throws so the plain form is shown', async () => {
-  for (const stop of ['refusal', 'max_tokens']) {
+  for (const stop of ['content_filter', 'length']) {
     const parse = createEntryParser({ client: fakeClient(reply(raw({}), stop)) });
     await assert.rejects(parse('x', { today: '2026-11-20', peopleNames: [] }), /model stopped/);
   }

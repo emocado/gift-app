@@ -1,9 +1,10 @@
 // Type-to-log: turn one typed line ("scarf for Amy, xmas, 25") into a draft for the
-// gift form. Claude reads the line; plain code then enforces the rules that matter,
+// gift form. A model reads the line; plain code then enforces the rules that matter,
 // so a wrong guess can never invent a cost or a date. The user always reviews and saves.
-import Anthropic from '@anthropic-ai/sdk';
+// The model is reached through OpenCode Zen's OpenAI-compatible API; AI_MODEL picks it.
 
-export const MODEL = 'claude-opus-5-5';
+export const MODEL = 'deepseek-v4.1-flash';
+export const BASE_URL = 'https://opencode.ai/zen/v1';
 
 const SYSTEM = `You read one short note a person typed while buying a gift, and pull out the fields for their gift log.
 
@@ -56,24 +57,41 @@ export function cleanDraft(raw, entry, peopleNames) {
   return { person, what: str('what'), occasion, cost, givenDate: date('given_date'), occasionDate: date('occasion_date') };
 }
 
-export function createEntryParser({ client = new Anthropic({ timeout: 30_000, maxRetries: 1 }), model = MODEL } = {}) {
+// Smallest client for an OpenAI-compatible chat API, shaped like the OpenAI SDK
+// (client.chat.completions.create) so tests and the eval can swap it out.
+export function createChatClient({ apiKey = process.env.OPENCODE_API_KEY, baseURL = process.env.AI_BASE_URL || BASE_URL, timeout = 30_000 } = {}) {
+  const create = async (params) => {
+    const res = await fetch(`${baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(timeout),
+    });
+    const body = await res.text();
+    if (!res.ok) throw Object.assign(new Error(`${res.status} ${body.slice(0, 300)}`), { status: res.status });
+    return JSON.parse(body);
+  };
+  return { chat: { completions: { create } } };
+}
+
+export function createEntryParser({ client = createChatClient(), model = process.env.AI_MODEL || MODEL } = {}) {
   return async function parseEntry(entry, { today, peopleNames }) {
-    const response = await client.beta.messages.create({
+    const response = await client.chat.completions.create({
       model,
-      max_tokens: 16000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      system: SYSTEM,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+      max_tokens: 4000,
+      temperature: 0,
+      response_format: { type: 'json_schema', json_schema: { name: 'gift_draft', strict: true, schema: SCHEMA } },
       messages: [
+        { role: 'system', content: SYSTEM },
         {
           role: 'user',
           content: `Today is ${today}.\nPeople on their list: ${peopleNames.length ? peopleNames.join(', ') : '(none yet)'}\n\nNote: ${entry}`,
         },
       ],
     });
-    if (response.stop_reason !== 'end_turn') throw new Error(`model stopped: ${response.stop_reason}`);
-    const text = response.content.find((b) => b.type === 'text')?.text;
+    const choice = response.choices?.[0];
+    if (choice?.finish_reason !== 'stop') throw new Error(`model stopped: ${choice?.finish_reason}`);
+    const text = choice.message?.content;
     if (!text) throw new Error('model returned no text');
     const draft = cleanDraft(JSON.parse(text), entry, peopleNames);
     // Only keep what the model actually found; the form fills in its own defaults.

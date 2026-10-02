@@ -137,13 +137,14 @@ const REF_EXTS = ['', '.html', '.txt', '.json'];
 
 // Type-to-log eval. Runs the app's real parseEntry (src/ai/parse-entry.js) on each
 // note in eval/cases.json and grades the draft field by field (eval/grade.mjs).
-import Anthropic from '@anthropic-ai/sdk';
-import { createEntryParser, MODEL } from '../src/ai/parse-entry.js';
+import { createChatClient, createEntryParser, MODEL } from '../src/ai/parse-entry.js';
 import { gradeDraft } from './grade.mjs';
 
 const CASES = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 'utf8'));
-// Retries are left to the harness backoff below so they are counted, not hidden in the SDK.
-let sdk = null;
+// Retries are left to the harness backoff below so they are counted, not hidden in a client.
+const chat = createChatClient({ timeout: 60_000 });
+// OpenAI-style finish_reason -> the stop_reason names the harness below reports on.
+const STOP = { stop: 'end_turn', length: 'max_tokens', content_filter: 'refusal' };
 
 /** Return the list of input cases. Each must have a stable `id`. */
 async function loadCases() {
@@ -163,26 +164,28 @@ async function loadCases() {
 async function runCase(input, ctx) {
   // Record the exact request and response the app makes, without changing the app.
   let params = null, response = null;
-  const client = { beta: { messages: { create: async (p) => (params = p, response = await (sdk ??= new Anthropic({ maxRetries: 0, timeout: 60_000 })).beta.messages.create(p)) } } };
+  const client = { chat: { completions: { create: async (p) => (params = p, response = await chat.chat.completions.create(p)) } } };
   const parseEntry = createEntryParser({ client, model: ctx.model ?? MODEL });
 
   let output = {};
+  const stopOf = () => { const f = response?.choices?.[0]?.finish_reason; return STOP[f] ?? f; };
   try {
     output = await parseEntry(input.note, { today: input.today, peopleNames: CASES.people });
   } catch (e) {
     // A refusal or cut-off reply is a graded outcome (blank draft), not a harness error.
-    if (!response || response.stop_reason === 'end_turn') throw e;
+    if (!response || stopOf() === 'end_turn') throw e;
   }
-  const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+  const stop_reason = stopOf();
+  const text = response.choices?.[0]?.message?.content ?? '';
   return {
     output,
     model: response.model,
     usage: response.usage,
-    stop_reason: response.stop_reason,
-    refused: response.stop_reason === 'refusal' ? 1 : 0,
+    stop_reason,
+    refused: stop_reason === 'refusal' ? 1 : 0,
     transcript: [
-      { role: 'system', content: params.system },
-      { role: 'user', content: params.messages[0].content },
+      { role: 'system', content: params.messages[0].content },
+      { role: 'user', content: params.messages[1].content },
       { role: 'assistant', content: `${text}\n\nAfter the app's checks:\n${JSON.stringify(output, null, 2)}` },
     ],
   };

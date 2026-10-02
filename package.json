@@ -11,10 +11,9 @@
     "start": "node --env-file-if-exists=.env src/server.js",
     "test": "node --test \"test/*.test.js\"",
     "remind": "node --env-file-if-exists=.env src/remind-cli.js",
-    "eval": "node --env-file-if-exists=.env eval/run-eval.mjs --flow .claude/hillclimb/type-to-log --variant baseline --model claude-opus-5-5"
+    "eval": "node --env-file-if-exists=.env eval/run-eval.mjs --flow .claude/hillclimb/type-to-log --variant baseline --model deepseek-v4.1-flash"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
     "nodemailer": "^10.0.13"
   }
 }

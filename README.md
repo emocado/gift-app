@@ -26,13 +26,13 @@ The look follows the season: snow from 1 Dec to 6 Jan, blossom petals to April, 
 
 Amounts are in SGD. Data is stored in `data/gifts.db` (one SQLite file, not committed). Back it up by copying that file.
 
-## Type-to-log (Claude)
+## Type-to-log (AI)
 
-With `ANTHROPIC_API_KEY` set in `.env`, the Add a gift page gets a box where you type one line, like `scarf for Amy, xmas, 25`. Claude (`claude-opus-5-5`) fills in the form and you check it before saving.
+With `OPENCODE_API_KEY` set in `.env` (an [OpenCode Zen](https://opencode.ai/zen) key), the Add a gift page gets a box where you type one line, like `scarf for Amy, xmas, 25`. The model (`deepseek-v4.1-flash` by default) fills in the form and you check it before saving.
 
 - Plain code, not the model, enforces three rules. A cost that isn't in what you typed is dropped. Names are matched to your list. Malformed dates are blanked.
-- If Claude is slow, fails or isn't set up, the normal form still works. Without the key, the box doesn't appear.
-- A refused request is retried on another model automatically (`fallbacks: "default"`).
+- If the model is slow, fails or isn't set up, the normal form still works. Without the key, the box doesn't appear.
+- To try another model on your OpenCode account, set `AI_MODEL` in `.env` (e.g. `qwen3.8-max`), then run the eval with `--model` set to it to compare.
 
 ## Evaluation: how well type-to-log reads your notes
 
@@ -44,7 +44,7 @@ With `ANTHROPIC_API_KEY` set in `.env`, the Add a gift page gets a box where you
 
 ```
 npm run eval -- --approve-harness   # first run only, after you have reviewed the eval files
-npm run eval                        # calls Claude once per case; resumes if interrupted
+npm run eval                        # calls the model once per case; resumes if interrupted
 ```
 
 Results go to `.claude/hillclimb/type-to-log/baseline/` (`results.jsonl`, plus `traces/` with the full request and response for each case). The runner refuses to run again if the prompt, grader, cases or runner change, until you approve them again with `--approve-harness`. That way a changed eval never runs without you noticing.
