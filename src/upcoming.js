@@ -13,6 +13,17 @@ export function lastGiftBefore(occ, history) {
   return past.find(sameKind(occ)) ?? past[0] ?? null;
 }
 
+const sumCents = (gifts) => gifts.reduce((t, g) => t + (g.costCents ?? 0), 0);
+
+// The same occasion one year earlier: last Christmas, this person's last birthday,
+// or the same custom event.
+function lastYearsGifts(occ, gifts) {
+  const year = String(Number(occ.date.slice(0, 4)) - 1);
+  return gifts.filter(
+    (g) => sameKind(occ)(g) && g.occasionDate.startsWith(year) && (occ.occasion !== 'birthday' || g.personId === occ.personId),
+  );
+}
+
 export function upcomingSections(db, today, days) {
   const people = db.listPeople();
   const gifts = db.listGifts();
@@ -21,11 +32,14 @@ export function upcomingSections(db, today, days) {
   const eventName = new Map(events.map((e) => [e.id, e.name]));
   return upcomingOccasions(people, today, days, events).map((occ) => {
     const { covered, missing } = coverage(occ, people, gifts);
+    const lastYear = lastYearsGifts(occ, gifts);
     return {
       occ,
       label: occasionLabel(occ.occasion, occ.date, occ.occasion === 'event' ? eventName.get(occ.eventId) : nameOf.get(occ.personId)),
       covered,
       missing: missing.map((person) => ({ person, lastGift: lastGiftBefore(occ, personHistory(person.id, gifts)) })),
+      spentCents: sumCents(covered.flatMap((c) => c.gifts)),
+      lastYearCents: lastYear.some((g) => g.costCents !== null) ? sumCents(lastYear) : null,
     };
   });
 }
