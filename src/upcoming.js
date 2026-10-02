@@ -4,6 +4,15 @@ import { upcomingOccasions } from './occasions.js';
 import { coverage, personHistory } from './coverage.js';
 import { occasionLabel } from './views.js';
 
+const sameKind = (occ) => (g) => g.occasion === occ.occasion && (occ.occasion !== 'event' || g.eventId === occ.eventId);
+
+// The most recent gift for an occasion before `occ`, same kind first (last birthday
+// for a birthday), so "last time" never shows a gift for something still to come.
+export function lastGiftBefore(occ, history) {
+  const past = history.filter((g) => g.occasionDate < occ.date);
+  return past.find(sameKind(occ)) ?? past[0] ?? null;
+}
+
 export function upcomingSections(db, today, days) {
   const people = db.listPeople();
   const gifts = db.listGifts();
@@ -16,7 +25,7 @@ export function upcomingSections(db, today, days) {
       occ,
       label: occasionLabel(occ.occasion, occ.date, occ.occasion === 'event' ? eventName.get(occ.eventId) : nameOf.get(occ.personId)),
       covered,
-      missing: missing.map((person) => ({ person, lastGift: personHistory(person.id, gifts)[0] ?? null })),
+      missing: missing.map((person) => ({ person, lastGift: lastGiftBefore(occ, personHistory(person.id, gifts)) })),
     };
   });
 }
