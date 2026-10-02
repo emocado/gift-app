@@ -155,7 +155,7 @@ test('events: create one with a list, log a gift for it, and see it on the home 
   res = await post('/gifts', { person: 'Gus', what: 'Plant', occasion: `event:${ev.id}`, cost: '30' });
   assert.match(flashOf(res), /Saved: Plant for Gus \(Housewarming 2026\)/);
   assert.deepEqual(db.listGifts().filter((g) => g.eventId === ev.id).map((g) => g.occasionDate), ['2026-12-05']);
-  assert.match(await get(`/people/${gus.id}`), /Housewarming 2026<\/strong>: Plant/);
+  assert.match(await get(`/people/${gus.id}`), /Plant[\s\S]*Housewarming 2026/);
 
   res = await post(`/events/${ev.id}/delete`, {});
   assert.equal(res.status, 400);

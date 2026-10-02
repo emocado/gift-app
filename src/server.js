@@ -64,7 +64,7 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
     send(res, extra.status ?? 200, views.giftFormPage({ values, peopleNames: peopleNames(), events: db.listEvents(), aiEnabled: !!parseEntry, season: season(), ...extra }));
 
   const peoplePage = (res, status, extra = {}) =>
-    send(res, status, views.peoplePage({ people: db.listPeople(), events: db.listEvents(), season: season(), ...extra }));
+    send(res, status, views.peoplePage({ people: db.listPeople(), gifts: db.listGifts(), events: db.listEvents(), season: season(), ...extra }));
   const eventsPage = (res, status, extra = {}) =>
     send(res, status, views.eventsPage({ events: db.listEvents(), people: db.listPeople(), today: today(), season: season(), ...extra }));
   const eventFrom = (f) => ({ name: f.name, date: f.date, repeats: f.repeats === '1', personIds: idsFrom(f, 'person_') });
@@ -110,9 +110,13 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
     try {
       const draft = await parseEntry(entry, { today: today(), peopleNames: peopleNames() });
       const known = draft.person && db.findPersonByName(draft.person);
+      const found = Object.keys(draft);
       return giftForm(res, { ...base, ...draft }, {
         confirmNewPerson: !!draft.person && !known,
-        notice: 'Check the details, then save.',
+        aiFilled: found,
+        notice: found.length
+          ? 'Check the highlighted details, then save.'
+          : "The AI couldn't find any gift details in that. Fill in the form below instead.",
       });
     } catch (err) {
       console.error('type-to-log failed:', err.message);
@@ -148,7 +152,7 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
       return redirect(res, withFlash(`/people/${gift.personId}`, `Deleted: ${gift.what}.`));
     }
     if (req.method === 'GET' && path === '/people') {
-      return peoplePage(res, 200, { flash, openId: Number(url.searchParams.get('edit')) || null });
+      return peoplePage(res, 200, { flash });
     }
     if (req.method === 'POST' && path === '/people') {
       const f = await readForm(req);
@@ -159,17 +163,19 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
         return peoplePage(res, 400, { error: err.message });
       }
     }
-    if (req.method === 'POST' && (m = path.match(/^\/people\/(\d+)$/))) {
+    // A person's page shows their history and is where their birthday and lists are edited.
+    if ((m = path.match(/^\/people\/(\d+)$/)) && (req.method === 'GET' || req.method === 'POST')) {
+      const person = db.getPerson(Number(m[1]));
+      if (!person) return send(res, 404, views.notFoundPage({ season: season() }));
+      const page = (extra) =>
+        views.personPage({ person, history: personHistory(person.id, db.listGifts()), events: db.listEvents(), flash, season: season(), ...extra });
+      if (req.method === 'GET') return send(res, 200, page());
       const f = await readForm(req);
       try {
-        const p = db.updatePerson(Number(m[1]), {
-          birthday: birthdayFrom(f),
-          onChristmasList: f.christmas === '1',
-          eventIds: idsFrom(f, 'event_'),
-        });
-        return redirect(res, withFlash('/people', `Saved ${p.name}.`));
+        db.updatePerson(person.id, { birthday: birthdayFrom(f), onChristmasList: f.christmas === '1', eventIds: idsFrom(f, 'event_') });
+        return redirect(res, withFlash(`/people/${person.id}`, 'Saved.'));
       } catch (err) {
-        return peoplePage(res, 400, { error: err.message, openId: Number(m[1]) });
+        return send(res, 400, page({ error: err.message }));
       }
     }
     if (req.method === 'GET' && path === '/events') return eventsPage(res, 200, { flash });
@@ -198,11 +204,6 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
       } catch (err) {
         return eventsPage(res, 400, { error: err.message });
       }
-    }
-    if (req.method === 'GET' && (m = path.match(/^\/people\/(\d+)$/))) {
-      const person = db.getPerson(Number(m[1]));
-      if (!person) return send(res, 404, views.notFoundPage({ season: season() }));
-      return send(res, 200, views.personPage({ person, history: personHistory(person.id, db.listGifts()), events: db.listEvents(), flash, season: season() }));
     }
     return send(res, 404, views.notFoundPage({ season: season() }));
   };
