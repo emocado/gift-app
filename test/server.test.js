@@ -172,3 +172,9 @@ test('people page: list toggles add and remove someone from an event', async () 
   assert.equal(res.status, 303);
   assert.deepEqual(db.getPerson(hal.id).eventIds, []);
 });
+
+test('type-to-log says when the AI key is turned down', async () => {
+  parseEntry = async () => { throw Object.assign(new Error('401 invalid key'), { status: 401 }); };
+  const html = await (await post('/gifts/parse', { entry: 'socks for amy' })).text();
+  assert.match(html, /check OPENCODE_API_KEY/);
+});

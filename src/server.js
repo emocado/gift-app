@@ -40,6 +40,14 @@ function birthdayFrom(f) {
   return `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+// Say why type-to-log failed, so a bad key doesn't look like a hard-to-read note.
+function aiFailureReason(err) {
+  if (err.status === 401 || err.status === 403) return "Couldn't read that automatically: the AI service turned down the request (check OPENCODE_API_KEY in .env).";
+  if (err.status === 429) return "Couldn't read that automatically: the AI service is busy right now.";
+  if (err.name === 'TimeoutError' || err.name === 'AbortError') return "Couldn't read that automatically: the AI took too long to answer.";
+  return "Couldn't read that automatically.";
+}
+
 // Ticked pill toggles named like "event_3" -> [3].
 const idsFrom = (f, prefix) =>
   Object.keys(f)
@@ -108,7 +116,7 @@ export function createApp({ db, today = localToday, parseEntry = null, season: f
       });
     } catch (err) {
       console.error('type-to-log failed:', err.message);
-      return giftForm(res, base, { error: "Couldn't read that automatically. Fill in the form below instead." });
+      return giftForm(res, base, { error: `${aiFailureReason(err)} Fill in the form below instead.` });
     }
   }
 
