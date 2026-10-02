@@ -178,5 +178,6 @@ export function openDb(path) {
     },
 
     deleteGift: (id) => db.prepare('DELETE FROM gifts WHERE id = ?').run(id),
+    close: () => db.close(),
   };
 }

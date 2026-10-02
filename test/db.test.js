@@ -130,5 +130,6 @@ test('an older database without events gets upgraded in place', () => {
   old.close();
   const db = openDb(path);
   assert.deepEqual(db.listGifts().map((g) => [g.what, g.eventId]), [['Scarf', null]]);
+  db.close(); // Windows can't delete an open file
   rmSync(dir, { recursive: true });
 });
