@@ -98,7 +98,8 @@ export const SKY_CSS = `
   .sky span { --spin:0deg; position:absolute; top:-24px; left:var(--x); width:calc(9px * var(--size)); height:calc(9px * var(--size)); background:var(--particle);
               --land:calc(100vh + 24px - var(--pile-h) * .6 - 9px * var(--size));
               animation:fall var(--dur) linear var(--delay) infinite; }
-  .sky-winter span { border-radius:50%; }
+  .sky span:nth-child(3n) { background:var(--particle2); }
+  .sky-winter span { border-radius:50%; box-shadow:0 0 6px var(--particle2); }
   .sky-spring span { --spin:540deg; border-radius:70% 0 70% 0; }
   .sky-autumn span { --spin:540deg; width:calc(12px * var(--size)); border-radius:0 80% 0 80%; }
   .sky-summer span { width:2px; height:calc(16px * var(--size)); border-radius:2px;
@@ -175,7 +176,7 @@ export const BASE_CSS = `
   .tabs { display:flex; gap:2px; background:var(--fill); padding:2px; border-radius:9px; margin-left:auto; }
   .tabs a { padding:5px 16px; border-radius:7px; font-size:14px; font-weight:500; color:var(--fg); }
   .tabs a:hover { text-decoration:none; background:var(--fill2); }
-  .tabs a.on { background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
+  .tabs a.on { background:var(--seg-on, var(--card)); box-shadow:0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
 
   /* type */
   .eyebrow { margin:0 0 2px; color:var(--fg2); font-size:15px; font-weight:500; }
@@ -201,16 +202,28 @@ export const BASE_CSS = `
   button.icon:hover { background:var(--fill); color:var(--red); }
   button:disabled { opacity:.6; cursor:default; transform:none; }
 
-  /* seasons: a soft wash of colour and a few slow falling things behind the cards */
-  .s-winter { --season:#64d2ff; --particle:rgba(150,185,220,.75); }
-  .s-spring { --season:#ff8fb1; --particle:rgba(242,160,190,.8); }
-  .s-summer { --season:#40c8e0; --particle:rgba(110,170,190,.5); }
-  .s-autumn { --season:#ff9f0a; --particle:rgba(217,130,70,.75); }
+  /* seasons: each has its own sky (top to bottom colour, a soft glow, stars on winter
+     nights) and its own falling things */
+  :root { --sky-top:var(--bg); --sky-bottom:var(--bg); --glow:transparent; --stars:linear-gradient(transparent, transparent);
+          --particle:rgba(140,140,150,.5); --particle2:var(--particle); --material:rgba(255,255,255,.74); }
+  .s-winter { --sky-top:#d6e6f5; --sky-bottom:#f2f6fa; --glow:rgba(255,255,255,.95); --particle:rgba(255,255,255,.95); --particle2:rgba(170,200,230,.9); }
+  .s-spring { --sky-top:#fbdde7; --sky-bottom:#fcf6f3; --glow:rgba(255,236,242,.9); --particle:rgba(240,140,175,.8); --particle2:rgba(250,195,210,.9); }
+  .s-summer { --sky-top:#cfe2e7; --sky-bottom:#eef5f6; --glow:rgba(255,255,255,.7); --particle:rgba(80,130,150,.4); --particle2:rgba(80,130,150,.28); }
+  .s-autumn { --sky-top:#f8dcbc; --sky-bottom:#fbf5ee; --glow:rgba(255,196,120,.55); --particle:rgba(210,105,40,.85); --particle2:rgba(225,165,50,.85); }
   @media (prefers-color-scheme: dark) {
-    .s-winter { --particle:rgba(230,238,246,.55); } .s-spring { --particle:rgba(232,163,184,.5); }
-    .s-summer { --particle:rgba(120,170,180,.4); } .s-autumn { --particle:rgba(200,120,60,.55); }
+    :root { --material:rgba(255,255,255,.06); --card-line:rgba(255,255,255,.09); --seg-on:rgba(255,255,255,.16); }
+    .s-winter { --sky-top:#17315b; --sky-bottom:#0a1426; --glow:rgba(170,200,255,.2); --particle:rgba(255,255,255,.9); --particle2:rgba(200,220,255,.7);
+                --stars:radial-gradient(1px 1px at 12% 18%, #fff9, transparent), radial-gradient(1px 1px at 28% 8%, #fff7, transparent),
+                        radial-gradient(1.5px 1.5px at 46% 22%, #fffa, transparent), radial-gradient(1px 1px at 63% 12%, #fff6, transparent),
+                        radial-gradient(1px 1px at 77% 28%, #fff8, transparent), radial-gradient(1.5px 1.5px at 91% 16%, #fff9, transparent),
+                        radial-gradient(1px 1px at 6% 40%, #fff5, transparent), radial-gradient(1px 1px at 55% 38%, #fff5, transparent); }
+    .s-spring { --sky-top:#3b1c3f; --sky-bottom:#170e1a; --glow:rgba(255,130,180,.16); --particle:rgba(255,160,195,.75); --particle2:rgba(255,205,220,.6); }
+    .s-summer { --sky-top:#11384a; --sky-bottom:#081a22; --glow:rgba(90,210,230,.13); --particle:rgba(170,215,235,.42); --particle2:rgba(170,215,235,.28); }
+    .s-autumn { --sky-top:#40220e; --sky-bottom:#1a0f08; --glow:rgba(255,140,40,.17); --particle:rgba(235,120,45,.8); --particle2:rgba(240,180,60,.7); }
   }
-  body { background:var(--bg) linear-gradient(180deg, color-mix(in srgb, var(--season, var(--bg)) 9%, var(--bg)), var(--bg) 420px) no-repeat; }
+  [class^="s-"] { --bg:var(--sky-bottom); --nav:color-mix(in srgb, var(--sky-top) 70%, transparent); }
+  body { min-height:100vh; background-color:var(--sky-bottom); background-attachment:fixed;
+         background-image:var(--stars), radial-gradient(900px 520px at 85% -8%, var(--glow), transparent 70%), linear-gradient(180deg, var(--sky-top), var(--sky-bottom)); }
   .season-emoji { font-size:15px; }
   @media (max-width:640px) { .tabs a { padding:5px 12px; } .brand span.name { display:none; } }
 `;
@@ -320,7 +333,7 @@ ${BASE_CSS}
   .seg label { position:relative; margin:0; cursor:pointer; }
   .seg input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
   .seg span { display:block; padding:6px 20px; border-radius:7px; font-size:14px; font-weight:500; transition:background .15s; }
-  .seg input:checked + span { background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
+  .seg input:checked + span { background:var(--seg-on, var(--card)); box-shadow:0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
   .seg input:focus-visible + span { outline:2px solid var(--tint); outline-offset:1px; }
 
   /* switch */
@@ -374,7 +387,10 @@ ${BASE_CSS}
   .lbl { display:block; font-size:13px; color:var(--fg2); font-weight:600; margin-bottom:6px; }
   .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-  /* seasons: a soft wash of colour (in BASE_CSS) and a few slow falling things behind the cards */
+  /* seasons: the sky is in BASE_CSS and the falling things in SKY_CSS; in the app,
+     cards are frosted glass over the sky */
+  .card, .tile, .banner:not(.warn), .ai-card { background:var(--material); backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%); }
+  .avatar-wrap .tick { border-color:var(--sky-bottom); }
   main.wrap { position:relative; z-index:1; }
 ${SKY_CSS}
 
